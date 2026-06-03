@@ -176,6 +176,27 @@ cd server
 npm start
 ```
 
+## Deploying on Vercel
+
+This repository is configured for a single Vercel project.
+
+1. Push the repository to GitHub.
+2. Import the repository in Vercel.
+3. Set the following environment variable in Vercel:
+
+```env
+MONGO_URI=your-mongodb-connection-string
+```
+
+4. Leave `CLIENT_ORIGIN` unset unless you need a custom cross-origin domain.
+5. Deploy with the repository root as the project root.
+
+Vercel will:
+
+- build the React client from `client/`
+- expose the Express API through `/api/index.js`
+- serve the SPA from the Vite production output
+
 ## Notes
 
 - Totals refresh after create/delete actions by refetching relevant datasets.

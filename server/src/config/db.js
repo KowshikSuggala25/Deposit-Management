@@ -1,14 +1,35 @@
 const mongoose = require("mongoose");
 
+const globalForMongoose = global;
+
+if (!globalForMongoose.__mongoConnectionPromise) {
+  globalForMongoose.__mongoConnectionPromise = null;
+}
+
 const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (globalForMongoose.__mongoConnectionPromise) {
+    return globalForMongoose.__mongoConnectionPromise;
+  }
+
   const mongoURI = process.env.MONGO_URI;
 
   if (!mongoURI) {
     throw new Error("MONGO_URI is not configured.");
   }
 
-  await mongoose.connect(mongoURI);
-  return mongoose.connection;
+  globalForMongoose.__mongoConnectionPromise = mongoose
+    .connect(mongoURI)
+    .then(() => mongoose.connection)
+    .catch((error) => {
+      globalForMongoose.__mongoConnectionPromise = null;
+      throw error;
+    });
+
+  return globalForMongoose.__mongoConnectionPromise;
 };
 
 module.exports = connectDB;
