@@ -189,7 +189,8 @@ MONGO_URI=your-mongodb-connection-string
 ```
 
 4. Leave `CLIENT_ORIGIN` unset unless you need a custom cross-origin domain.
-5. Deploy with the repository root as the project root.
+5. Set the project root to the repository root, not `client/`.
+6. Deploy with the repository root as the project root.
 
 Vercel will:
 
