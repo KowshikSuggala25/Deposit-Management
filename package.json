@@ -6,6 +6,6 @@
     "server"
   ],
   "scripts": {
-    "build": "npm --workspace client run build"
+    "build": "npm --workspace client run build && node scripts/copy-client-dist.js"
   }
 }
