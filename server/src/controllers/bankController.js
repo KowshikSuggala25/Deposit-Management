@@ -78,7 +78,23 @@ const getBankDetails = asyncHandler(async (req, res) => {
     throw httpError(400, "Invalid bank id");
   }
 
-  const bank = await Bank.findById(bankId).lean();
+  console.log("Requested bankId:", bankId);
+console.log("Length:", bankId.length);
+console.log("Valid ObjectId:", mongoose.isValidObjectId(bankId));
+
+const allBanks = await Bank.find().lean();
+
+console.log(
+  "Available Banks:",
+  allBanks.map((b) => ({
+    id: b._id.toString(),
+    name: b.bankName,
+  }))
+);
+const bank = await Bank.findOne({
+  _id: new mongoose.Types.ObjectId(bankId),
+}).lean();
+console.log("Found Bank:", bank);
 
   if (!bank) {
     throw httpError(404, "Bank not found");
