@@ -1,8 +1,13 @@
+import { useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage";
 import BankDetailsPage from "./pages/BankDetailsPage";
 import HolderDetailsPage from "./pages/HolderDetailsPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import FinanceLandingPage from "./pages/FinanceLandingPage";
+import HandCashPage from "./pages/HandCashPage";
+import FinanceCategoryPage from "./pages/FinanceCategoryPage";
+import LoginPage from "./pages/LoginPage";
 
 const AppLayout = ({ children }) => {
   return (
@@ -15,10 +20,21 @@ const AppLayout = ({ children }) => {
 };
 
 const App = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => sessionStorage.getItem("finance-authenticated") === "true"
+  );
+
+  if (!isAuthenticated) {
+    return <LoginPage onSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   return (
     <AppLayout>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<FinanceLandingPage />} />
+        <Route path="/banks" element={<DashboardPage />} />
+        <Route path="/hand-cash" element={<HandCashPage />} />
+        <Route path="/hand-cash/:category" element={<FinanceCategoryPage />} />
         <Route path="/banks/:bankId" element={<BankDetailsPage />} />
         <Route path="/holders/:holderId" element={<HolderDetailsPage />} />
         <Route path="/404" element={<NotFoundPage />} />

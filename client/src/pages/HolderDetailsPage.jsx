@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FiArrowLeft, FiDownload, FiEdit2, FiPlus, FiHash } from "react-icons/fi";
+import { FiArrowLeft, FiCheck, FiDownload, FiEdit2, FiPlus, FiHash, FiRotateCcw } from "react-icons/fi";
 import { BiRupee } from "react-icons/bi";
 import toast from "react-hot-toast";
 import useDashboardStore from "../store/useDashboardStore";
@@ -19,7 +19,16 @@ import { exportHolderPdf } from "../utils/pdfExport";
 const HolderDetailsPage = () => {
   const { holderId } = useParams();
   const navigate = useNavigate();
-  const { holderDetails, loading, fetchHolderDetails, addDeposit, editDeposit, deleteDeposit } = useDashboardStore();
+  const {
+    holderDetails,
+    loading,
+    fetchHolderDetails,
+    addDeposit,
+    editDeposit,
+    finishDeposit,
+    undoFinishDeposit,
+    deleteDeposit,
+  } = useDashboardStore();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [range, setRange] = useState("");
@@ -31,6 +40,8 @@ const HolderDetailsPage = () => {
   const [formState, setFormState] = useState({
     depositDate: "",
     amount: "",
+    interestRate: "0",
+    expectedAmountPeriod: "year",
   });
 
   const loadData = async ({ resetPage = false } = {}) => {
@@ -70,6 +81,8 @@ const HolderDetailsPage = () => {
       const payload = {
         depositDate: formState.depositDate,
         amount: Number(formState.amount),
+        interestRate: Number(formState.interestRate),
+        expectedAmountPeriod: formState.expectedAmountPeriod,
       };
 
       if (isEditMode && selectedDepositId) {
@@ -80,7 +93,7 @@ const HolderDetailsPage = () => {
         toast.success("Deposit added successfully");
       }
 
-      setFormState({ depositDate: "", amount: "" });
+      setFormState({ depositDate: "", amount: "", interestRate: "0", expectedAmountPeriod: "year" });
       setSelectedDepositId(null);
       setIsEditMode(false);
       setIsModalOpen(false);
@@ -104,8 +117,36 @@ const HolderDetailsPage = () => {
     }
   };
 
+  const handleFinishDeposit = async (depositId) => {
+    if (!window.confirm("Finish this deposit and record today's date?")) {
+      return;
+    }
+
+    try {
+      await finishDeposit(depositId);
+      toast.success("Deposit finished");
+      await loadData({ resetPage: true });
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleUndoFinishDeposit = async (depositId) => {
+    if (!window.confirm("Undo finish and remove today's copied record?")) {
+      return;
+    }
+
+    try {
+      await undoFinishDeposit(depositId);
+      toast.success("Deposit finish undone");
+      await loadData({ resetPage: true });
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
   const openAddDepositModal = () => {
-    setFormState({ depositDate: "", amount: "" });
+    setFormState({ depositDate: "", amount: "", interestRate: "0", expectedAmountPeriod: "year" });
     setSelectedDepositId(null);
     setIsEditMode(false);
     setIsModalOpen(true);
@@ -115,10 +156,30 @@ const HolderDetailsPage = () => {
     setFormState({
       depositDate: new Date(deposit.depositDate).toISOString().split("T")[0],
       amount: String(deposit.amount),
+      interestRate: String(deposit.interestRate ?? 0),
+      expectedAmountPeriod: deposit.expectedAmountPeriod ?? "year",
     });
     setSelectedDepositId(deposit._id);
     setIsEditMode(true);
     setIsModalOpen(true);
+  };
+
+  const handleExpectedAmountPeriodChange = async (deposit, expectedAmountPeriod) => {
+    if (deposit.expectedAmountPeriod === expectedAmountPeriod) {
+      return;
+    }
+
+    try {
+      await editDeposit(deposit._id, {
+        depositDate: deposit.depositDate,
+        amount: deposit.amount,
+        interestRate: deposit.interestRate ?? 0,
+        expectedAmountPeriod,
+      });
+      await loadData();
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   const holder = holderDetails.holder;
@@ -130,10 +191,10 @@ const HolderDetailsPage = () => {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => navigate(`/banks/${holder?.bankId || ""}`)}
+            onClick={() => navigate(holder?.category && holder.category !== "bank" ? `/hand-cash/${holder.category}` : `/banks/${holder?.bankId || ""}`)}
             className="inline-flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm text-slate-700 hover:bg-white"
           >
-            <FiArrowLeft /> Bank Details
+            <FiArrowLeft /> {holder?.category && holder.category !== "bank" ? "Finance Details" : "Bank Details"}
           </button>
           <div className="flex flex-wrap gap-2">
             <button
@@ -158,7 +219,7 @@ const HolderDetailsPage = () => {
         </div>
         <h1 className="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">{holder?.name || "Holder Details"}</h1>
         <p className="mt-1 text-sm text-slate-700">Phone: {holder?.phoneNumber || "-"}</p>
-        <p className="text-sm text-slate-700">Bank: {holder?.bankName || "-"}</p>
+        <p className="text-sm text-slate-700">{holder?.category && holder.category !== "bank" ? "Finance" : "Bank"}: {holder?.bankName || "-"}</p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -220,6 +281,8 @@ const HolderDetailsPage = () => {
                 <tr>
                   <th className="px-4 py-3 font-semibold text-slate-700">Date</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Amount</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">{holder?.category && holder.category !== "bank" ? "Rate / ₹100" : "Interest Rate"}</th>
+                  <th className="px-4 py-3 font-semibold text-slate-700">Expected Amount</th>
                   <th className="px-4 py-3 font-semibold text-slate-700">Action</th>
                 </tr>
               </thead>
@@ -228,15 +291,60 @@ const HolderDetailsPage = () => {
                   <tr key={deposit._id} className="border-t border-white/40">
                     <td className="px-4 py-3 text-slate-700">{formatDisplayDate(deposit.depositDate)}</td>
                     <td className="px-4 py-3 font-medium text-indigo-700">{formatINR(deposit.amount)}</td>
+                    <td className="px-4 py-3 text-slate-700">{deposit.interestRate ?? 0}{holder?.category && holder.category !== "bank" ? " rupees / ₹100" : "% p.a."}</td>
+                    <td className="px-4 py-3 font-medium text-emerald-700">
+                      <div>{formatINR(deposit.expectedAmount ?? deposit.amount)}</div>
+                      <div className="mt-1 flex gap-1">
+                        {["month", "year"].map((period) => (
+                          <button
+                            key={period}
+                            type="button"
+                            onClick={() => handleExpectedAmountPeriodChange(deposit, period)}
+                            disabled={loading.mutation}
+                            className={`rounded px-1.5 py-0.5 text-[10px] ${
+                              deposit.expectedAmountPeriod === period
+                                ? "bg-emerald-600 text-white"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {period === "month" ? "Month" : "Year"}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => openEditDepositModal(deposit)}
+                          disabled={deposit.isFinished}
                           className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-200"
                         >
                           <span className="inline-flex items-center gap-1"><FiEdit2 /> Edit</span>
                         </button>
+                        {deposit.isFinished && deposit.finishedDepositId ? (
+                          <button
+                            type="button"
+                            onClick={() => handleUndoFinishDeposit(deposit._id)}
+                            disabled={loading.mutation}
+                            className="inline-flex items-center gap-1 rounded-lg bg-orange-100 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-200 disabled:opacity-60"
+                          >
+                            <FiRotateCcw /> Undo
+                          </button>
+                        ) : deposit.isFinished ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                            <FiCheck /> Finished
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleFinishDeposit(deposit._id)}
+                            disabled={loading.mutation}
+                            className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-200 disabled:opacity-60"
+                          >
+                            Finish
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleDeleteDeposit(deposit._id)}
@@ -271,6 +379,37 @@ const HolderDetailsPage = () => {
               className="mt-1 w-full rounded-lg border border-slate-200 bg-white/70 px-3 py-2"
             />
           </label>
+          <label className="block text-sm font-medium text-slate-700">
+            {holder?.category && holder.category !== "bank" ? "Rate (rupees per ₹100)" : "Interest Rate (% per year)"}
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={formState.interestRate}
+              onChange={(event) => setFormState((prev) => ({ ...prev, interestRate: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white/70 px-3 py-2"
+              placeholder={holder?.category && holder.category !== "bank" ? "Enter rate per ₹100" : "Enter annual interest rate"}
+            />
+          </label>
+          <fieldset>
+            <legend className="text-sm font-medium text-slate-700">Expected Amount Period</legend>
+            <div className="mt-1 flex gap-2">
+              {["month", "year"].map((period) => (
+                <button
+                  key={period}
+                  type="button"
+                  onClick={() => setFormState((prev) => ({ ...prev, expectedAmountPeriod: period }))}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                    formState.expectedAmountPeriod === period
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  {period === "month" ? "Month" : "Year"}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <label className="block text-sm font-medium text-slate-700">
             Deposit Amount
             <input

@@ -6,6 +6,7 @@ const asyncHandler = require("../middleware/asyncHandler");
 const getPagination = require("../utils/pagination");
 const buildDateRange = require("../utils/dateFilters");
 const httpError = require("../utils/httpError");
+const getExpectedAmount = require("../utils/expectedAmount");
 
 const getHolderDetails = asyncHandler(async (req, res) => {
   const { holderId } = req.params;
@@ -21,11 +22,7 @@ const getHolderDetails = asyncHandler(async (req, res) => {
     throw httpError(404, "Account holder not found");
   }
 
-  const bank = await Bank.findById(holder.bankId).lean();
-
-  if (!bank) {
-    throw httpError(404, "Bank not found");
-  }
+  const bank = holder.bankId ? await Bank.findById(holder.bankId).lean() : null;
 
   const dateRange = buildDateRange({ range, startDate, endDate });
 
@@ -87,6 +84,11 @@ const getHolderDetails = asyncHandler(async (req, res) => {
         $project: {
           depositDate: 1,
           amount: 1,
+          interestRate: 1,
+          expectedAmountPeriod: 1,
+          isFinished: 1,
+          finishedDepositId: 1,
+          originalDepositId: 1,
           createdAt: 1,
         },
       },
@@ -95,6 +97,7 @@ const getHolderDetails = asyncHandler(async (req, res) => {
       {
         $match: {
           holderId: new mongoose.Types.ObjectId(holderId),
+          isFinished: { $ne: true },
         },
       },
       {
@@ -116,14 +119,24 @@ const getHolderDetails = asyncHandler(async (req, res) => {
         _id: holder._id,
         name: holder.name,
         phoneNumber: holder.phoneNumber,
-        bankId: bank._id,
-        bankName: bank.bankName,
+        bankId: bank?._id || null,
+        bankName: bank?.bankName || (holder.category === "gold" ? "Gold Finance" : "Cash Finance"),
+        category: holder.category || "bank",
       },
       stats: {
         totalDepositsCount: totalStats[0]?.totalCount || 0,
         totalDepositedAmount: totalStats[0]?.totalAmount || 0,
       },
-      deposits: filteredDeposits,
+      deposits: filteredDeposits.map((deposit) => ({
+        ...deposit,
+        expectedAmount: getExpectedAmount(
+          deposit.amount,
+          deposit.interestRate,
+          deposit.depositDate,
+          deposit.expectedAmountPeriod,
+          holder.category || "bank"
+        ),
+      })),
       pagination: {
         page: currentPage,
         limit: perPage,
@@ -136,7 +149,7 @@ const getHolderDetails = asyncHandler(async (req, res) => {
 
 const createDeposit = asyncHandler(async (req, res) => {
   const { holderId } = req.params;
-  const { depositDate, amount } = req.body;
+  const { depositDate, amount, interestRate = 0, expectedAmountPeriod = "year" } = req.body;
 
   if (!mongoose.isValidObjectId(holderId)) {
     throw httpError(400, "Invalid holder id");
@@ -150,8 +163,11 @@ const createDeposit = asyncHandler(async (req, res) => {
 
   const createdDeposit = await Deposit.create({
     holderId,
+    category: holder.category || "bank",
     depositDate,
     amount,
+    interestRate,
+    expectedAmountPeriod,
   });
 
   res.status(201).json({
@@ -163,7 +179,7 @@ const createDeposit = asyncHandler(async (req, res) => {
 
 const updateDeposit = asyncHandler(async (req, res) => {
   const { depositId } = req.params;
-  const { depositDate, amount } = req.body;
+  const { depositDate, amount, interestRate, expectedAmountPeriod } = req.body;
 
   if (!mongoose.isValidObjectId(depositId)) {
     throw httpError(400, "Invalid deposit id");
@@ -177,11 +193,95 @@ const updateDeposit = asyncHandler(async (req, res) => {
 
   deposit.depositDate = depositDate;
   deposit.amount = amount;
+  if (interestRate !== undefined) {
+    deposit.interestRate = interestRate;
+  }
+  if (expectedAmountPeriod !== undefined) {
+    deposit.expectedAmountPeriod = expectedAmountPeriod;
+  }
   await deposit.save();
 
   res.json({
     success: true,
     message: "Deposit updated successfully",
+    data: deposit,
+  });
+});
+
+const finishDeposit = asyncHandler(async (req, res) => {
+  const { depositId } = req.params;
+
+  if (!mongoose.isValidObjectId(depositId)) {
+    throw httpError(400, "Invalid deposit id");
+  }
+
+  const deposit = await Deposit.findById(depositId);
+
+  if (!deposit) {
+    throw httpError(404, "Deposit not found");
+  }
+
+  if (deposit.isFinished) {
+    throw httpError(400, "Deposit is already finished");
+  }
+
+  const holder = await AccountHolder.findById(deposit.holderId).select("category");
+  const finishedDeposit = await Deposit.create({
+    holderId: deposit.holderId,
+    category: holder?.category || deposit.category || "bank",
+    depositDate: new Date(),
+    amount: deposit.amount,
+    interestRate: deposit.interestRate,
+    expectedAmountPeriod: deposit.expectedAmountPeriod,
+    isFinished: true,
+    originalDepositId: deposit._id,
+  });
+
+  deposit.isFinished = true;
+  deposit.finishedDepositId = finishedDeposit._id;
+  await deposit.save();
+
+  res.status(201).json({
+    success: true,
+    message: "Deposit finished successfully",
+    data: finishedDeposit,
+  });
+});
+
+const undoFinishDeposit = asyncHandler(async (req, res) => {
+  const { depositId } = req.params;
+
+  if (!mongoose.isValidObjectId(depositId)) {
+    throw httpError(400, "Invalid deposit id");
+  }
+
+  const deposit = await Deposit.findById(depositId);
+
+  if (!deposit) {
+    throw httpError(404, "Deposit not found");
+  }
+
+  if (!deposit.isFinished || !deposit.finishedDepositId) {
+    throw httpError(400, "This deposit cannot be undone");
+  }
+
+  const finishedDeposit = await Deposit.findOne({
+    _id: deposit.finishedDepositId,
+    originalDepositId: deposit._id,
+  });
+
+  if (!finishedDeposit) {
+    throw httpError(404, "Finished deposit copy not found");
+  }
+
+  deposit.isFinished = false;
+  deposit.finishedDepositId = null;
+  await deposit.save();
+  await Deposit.findByIdAndDelete(finishedDeposit._id);
+
+  res.json({
+    success: true,
+    message: "Deposit finish undone successfully",
     data: deposit,
   });
 });
@@ -232,6 +332,8 @@ module.exports = {
   getHolderDetails,
   createDeposit,
   updateDeposit,
+  finishDeposit,
+  undoFinishDeposit,
   deleteHolder,
   deleteDeposit,
 };

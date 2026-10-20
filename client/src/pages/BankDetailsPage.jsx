@@ -104,7 +104,7 @@ const BankDetailsPage = () => {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/banks")}
             className="inline-flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm text-slate-700 hover:bg-white"
           >
             <FiArrowLeft /> Dashboard

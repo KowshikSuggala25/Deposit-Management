@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiBriefcase, FiDownload, FiEdit2, FiPlus, FiUsers } from "react-icons/fi";
+import { FiArrowLeft, FiBriefcase, FiDownload, FiEdit2, FiPlus, FiUsers } from "react-icons/fi";
 import { BiRupee } from "react-icons/bi";
 import toast from "react-hot-toast";
 import useDashboardStore from "../store/useDashboardStore";
@@ -106,7 +106,16 @@ const DashboardPage = () => {
     <section className="space-y-6">
       <header className="glass-card rounded-2xl border border-white/50 bg-white/30 p-5 backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Bank Deposit Management Dashboard</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="inline-flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm text-slate-700 transition hover:bg-white"
+            >
+              <FiArrowLeft /> Finance Management
+            </button>
+            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Bank Deposit Management Dashboard</h1>
+          </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"

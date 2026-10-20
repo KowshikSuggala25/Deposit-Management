@@ -126,6 +126,7 @@ console.log("Found Bank:", bank);
           from: "deposits",
           localField: "_id",
           foreignField: "holderId",
+          pipeline: [{ $match: { isFinished: { $ne: true } } }],
           as: "deposits",
         },
       },
@@ -152,6 +153,7 @@ console.log("Found Bank:", bank);
       {
         $match: {
           "holder.bankId": new mongoose.Types.ObjectId(bankId),
+          isFinished: { $ne: true },
         },
       },
       {
@@ -198,6 +200,7 @@ const createHolder = asyncHandler(async (req, res) => {
 
   const holder = await AccountHolder.create({
     bankId,
+    category: "bank",
     name: name.trim(),
     phoneNumber: phoneNumber.trim(),
   });

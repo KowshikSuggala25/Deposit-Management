@@ -23,6 +23,11 @@ const useDashboardStore = create((set, get) => ({
     holders: [],
     pagination: { ...initialPagination },
   },
+  financeDetails: {
+    finance: null,
+    holders: [],
+    pagination: { ...initialPagination, limit: 9 },
+  },
   holderDetails: {
     holder: null,
     stats: {
@@ -107,6 +112,29 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
+  fetchFinanceDetails: async (category, { search = "", page = 1, limit = 9 } = {}) => {
+    get().setLoading("bankDetails", true);
+    try {
+      const response = await api.get(`/finance/${category}`, { params: { search, page, limit } });
+      set({ financeDetails: response.data.data });
+      return response.data.data;
+    } finally {
+      get().setLoading("bankDetails", false);
+    }
+  },
+
+  addFinanceHolder: async (category, payload) => {
+    get().setLoading("mutation", true);
+    try { await api.post(`/finance/${category}/holders`, payload); }
+    finally { get().setLoading("mutation", false); }
+  },
+
+  editFinanceHolder: async (category, holderId, payload) => {
+    get().setLoading("mutation", true);
+    try { await api.put(`/finance/${category}/holders/${holderId}`, payload); }
+    finally { get().setLoading("mutation", false); }
+  },
+
   addHolder: async (bankId, payload) => {
     get().setLoading("mutation", true);
 
@@ -177,6 +205,26 @@ const useDashboardStore = create((set, get) => ({
 
     try {
       await api.put(`/holders/deposits/${depositId}`, payload);
+    } finally {
+      get().setLoading("mutation", false);
+    }
+  },
+
+  finishDeposit: async (depositId) => {
+    get().setLoading("mutation", true);
+
+    try {
+      await api.post(`/holders/deposits/${depositId}/finish`);
+    } finally {
+      get().setLoading("mutation", false);
+    }
+  },
+
+  undoFinishDeposit: async (depositId) => {
+    get().setLoading("mutation", true);
+
+    try {
+      await api.post(`/holders/deposits/${depositId}/undo-finish`);
     } finally {
       get().setLoading("mutation", false);
     }

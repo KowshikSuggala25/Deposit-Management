@@ -4,6 +4,8 @@ const {
   getHolderDetails,
   createDeposit,
   updateDeposit,
+  finishDeposit,
+  undoFinishDeposit,
   deleteHolder,
   deleteDeposit,
 } = require("../controllers/holderController");
@@ -24,6 +26,8 @@ router.post(
     param("holderId").isMongoId().withMessage("Invalid holder id"),
     body("depositDate").notEmpty().withMessage("Date is required").isISO8601().withMessage("Invalid date"),
     body("amount").isFloat({ gt: 0 }).withMessage("Amount must be greater than zero"),
+    body("interestRate").optional().isFloat({ min: 0 }).withMessage("Interest rate cannot be negative"),
+    body("expectedAmountPeriod").optional().isIn(["month", "year"]).withMessage("Invalid expected amount period"),
   ],
   validateRequest,
   createDeposit
@@ -35,9 +39,25 @@ router.put(
     param("depositId").isMongoId().withMessage("Invalid deposit id"),
     body("depositDate").notEmpty().withMessage("Date is required").isISO8601().withMessage("Invalid date"),
     body("amount").isFloat({ gt: 0 }).withMessage("Amount must be greater than zero"),
+    body("interestRate").optional().isFloat({ min: 0 }).withMessage("Interest rate cannot be negative"),
+    body("expectedAmountPeriod").optional().isIn(["month", "year"]).withMessage("Invalid expected amount period"),
   ],
   validateRequest,
   updateDeposit
+);
+
+router.post(
+  "/deposits/:depositId/finish",
+  [param("depositId").isMongoId().withMessage("Invalid deposit id")],
+  validateRequest,
+  finishDeposit
+);
+
+router.post(
+  "/deposits/:depositId/undo-finish",
+  [param("depositId").isMongoId().withMessage("Invalid deposit id")],
+  validateRequest,
+  undoFinishDeposit
 );
 
 router.delete(

@@ -5,7 +5,13 @@ const accountHolderSchema = new mongoose.Schema(
     bankId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Bank",
-      required: true,
+      required: false,
+      index: true,
+    },
+    category: {
+      type: String,
+      enum: ["bank", "gold", "cash"],
+      default: "bank",
       index: true,
     },
     name: {
@@ -29,5 +35,6 @@ const accountHolderSchema = new mongoose.Schema(
 );
 
 accountHolderSchema.index({ bankId: 1, name: 1 });
+accountHolderSchema.index({ category: 1, name: 1 });
 
 module.exports = mongoose.model("AccountHolder", accountHolderSchema);

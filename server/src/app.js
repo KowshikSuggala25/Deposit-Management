@@ -4,6 +4,7 @@ const morgan = require("morgan");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const bankRoutes = require("./routes/bankRoutes");
 const holderRoutes = require("./routes/holderRoutes");
+const financeRoutes = require("./routes/financeRoutes");
 const { errorHandler, notFound } = require("./middleware/errorHandler");
 
 const app = express();
@@ -26,6 +27,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/banks", bankRoutes);
 app.use("/api/holders", holderRoutes);
+app.use("/api/finance", financeRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

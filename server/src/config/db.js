@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const dns = require("dns");
 
 const globalForMongoose = global;
 
@@ -19,6 +20,15 @@ const connectDB = async () => {
 
   if (!mongoURI) {
     throw new Error("MONGO_URI is not configured.");
+  }
+
+  const dnsServers = process.env.DNS_SERVERS
+    ?.split(",")
+    .map((server) => server.trim())
+    .filter(Boolean);
+
+  if (dnsServers?.length) {
+    dns.setServers(dnsServers);
   }
 
   globalForMongoose.__mongoConnectionPromise = mongoose

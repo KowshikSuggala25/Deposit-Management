@@ -135,6 +135,7 @@ Edit .env and set:
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/bank_deposit_dashboard
 CLIENT_ORIGIN=http://localhost:5173
+DNS_SERVERS=1.1.1.1,8.8.8.8
 ```
 
 Install and run backend:

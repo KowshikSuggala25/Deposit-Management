@@ -16,8 +16,11 @@ const getDashboard = asyncHandler(async (req, res) => {
 
   const [totalBanks, totalAccountHolders, depositSummary, totalFilteredBanks, banks] = await Promise.all([
     Bank.countDocuments(),
-    AccountHolder.countDocuments(),
+    AccountHolder.countDocuments({ $or: [{ category: "bank" }, { category: { $exists: false } }] }),
     Deposit.aggregate([
+      {
+        $match: { isFinished: { $ne: true }, $or: [{ category: "bank" }, { category: { $exists: false } }] },
+      },
       {
         $group: {
           _id: null,
@@ -46,9 +49,8 @@ const getDashboard = asyncHandler(async (req, res) => {
           pipeline: [
             {
               $match: {
-                $expr: {
-                  $in: ["$holderId", "$$holderIds"],
-                },
+                $expr: { $in: ["$holderId", "$$holderIds"] },
+                isFinished: { $ne: true },
               },
             },
             {
